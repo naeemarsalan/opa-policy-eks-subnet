@@ -1,0 +1,53 @@
+apiVersion: templates.gatekeeper.sh/v1beta1
+kind: ConstraintTemplate
+metadata:
+  name: subnetwhitelist
+spec:
+  crd:
+    spec:
+      names:
+        kind: subnetwhitelist
+      validation:
+        # Schema for the `parameters` field
+        openAPIV3Schema:
+          properties:
+            subnet:
+              type: array
+              items: string
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package subnetwhitelist
+        whitelisted_subnet = {subnet |
+            subnet = input.parameters.subnet[_]
+        }
+    
+        subnet_whitelisted(str, patterns) {
+            subnet_matches(str, patterns[_])
+        }
+    
+        subnet_matches(str, pattern) {
+            contains(str, pattern)
+        }
+        violation[{"msg": msg}] {
+          input.review.object
+          subnet := input.review.object.spec.subnets[_]
+          name := input.review.object.metadata.name
+          not subnet_whitelisted(subnet, whitelisted_subnet)
+          msg := sprintf("eks cluster %q has invalid subnet %q. Please, contact your DevOps. Follow the whitelisted subnet %v", [name, subnet, whitelisted_subnet])
+        }
+---
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: subnetwhitelist
+metadata:
+  name: subnetwhitelist
+spec:
+  match:
+    kinds:
+      - apiGroups: ["*"]
+        kinds: ["EKSClusterConfig"]
+  parameters:
+    subnet:
+      # AWS Internal ECR registries
+      - subnet-test-allowed3
+      - subnet-test-allowed4
