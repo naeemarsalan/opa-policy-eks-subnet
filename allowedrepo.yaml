@@ -48,6 +48,5 @@ spec:
         kinds: ["EKSClusterConfig"]
   parameters:
     subnet:
-      # AWS Internal ECR registries
       - subnet-test-allowed3
       - subnet-test-allowed4
